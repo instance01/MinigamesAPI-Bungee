@@ -1,0 +1,9 @@
+name: MinigamesLibBungee
+main: com.instancedev.minigamesapibungee.Main
+version: 1.0.0
+author: InstanceLabs
+commands:
+   mg:
+      description: Main command
+      usage: /mg [action]
+      aliases: [mglib, mgapi, mapi, mglibbungee]
