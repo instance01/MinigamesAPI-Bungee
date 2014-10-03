@@ -24,6 +24,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 
 import com.google.common.io.ByteArrayDataInput;
+import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 
 public class Main extends JavaPlugin implements PluginMessageListener, Listener {
@@ -110,6 +111,28 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 				final Sign s = (Sign) event.getClickedBlock().getState();
 				String server = getServerBySignLocation(s.getLocation());
 				if (server != null && server != "") {
+					try {
+						ByteArrayDataOutput out = ByteStreams.newDataOutput();
+						try {
+							out.writeUTF("Forward");
+							out.writeUTF("ALL");
+							out.writeUTF("MinigamesLibBack");
+
+							ByteArrayOutputStream msgbytes = new ByteArrayOutputStream();
+							DataOutputStream msgout = new DataOutputStream(msgbytes);
+							System.out.println(getInfoBySignLocation(s.getLocation()) + ":" + event.getPlayer().getName());
+							msgout.writeUTF(getInfoBySignLocation(s.getLocation()) + ":" + event.getPlayer().getName());
+
+							out.writeShort(msgbytes.toByteArray().length);
+							out.write(msgbytes.toByteArray());
+
+							Bukkit.getServer().sendPluginMessage(this, "BungeeCord", out.toByteArray());
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					} catch (Exception e) {
+						// TODO
+					}
 					connectToServer(this, event.getPlayer().getName(), server);
 				}
 			}
@@ -150,6 +173,20 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 					Location l = new Location(Bukkit.getWorld(getConfig().getString("arenas." + mg_key + "." + arena_key + ".world")), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.x"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.y"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.z"));
 					if (l.distance(sign) < 1) {
 						return getConfig().getString("arenas." + mg_key + "." + arena_key + ".server");
+					}
+				}
+			}
+		}
+		return "";
+	}
+
+	public String getInfoBySignLocation(Location sign) {
+		if (getConfig().isSet("arenas.")) {
+			for (String mg_key : getConfig().getConfigurationSection("arenas.").getKeys(false)) {
+				for (String arena_key : getConfig().getConfigurationSection("arenas." + mg_key + ".").getKeys(false)) {
+					Location l = new Location(Bukkit.getWorld(getConfig().getString("arenas." + mg_key + "." + arena_key + ".world")), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.x"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.y"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.z"));
+					if (l.distance(sign) < 1) {
+						return mg_key + ":" + arena_key;
 					}
 				}
 			}
