@@ -17,6 +17,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -38,7 +39,6 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 
 	@Override
 	public void onPluginMessageReceived(String channel, Player player, byte[] message) {
-		System.out.println(channel);
 		if (!channel.equals("BungeeCord")) {
 			return;
 		}
@@ -51,14 +51,18 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 
 			DataInputStream msgin = new DataInputStream(new ByteArrayInputStream(msgbytes));
 			try {
-				String signData = msgin.readUTF();
-				String plugin_ = signData.split(":")[0];
-				String arena = signData.split(":")[1];
-				String arenastate = signData.split(":")[2];
-				int count = Integer.parseInt(signData.split(":")[3]);
-				int maxcount = Integer.parseInt(signData.split(":")[4]);
+				final String signData = msgin.readUTF();
+				final String plugin_ = signData.split(":")[0];
+				final String arena = signData.split(":")[1];
+				final String arenastate = signData.split(":")[2];
+				final int count = Integer.parseInt(signData.split(":")[3]);
+				final int maxcount = Integer.parseInt(signData.split(":")[4]);
 				System.out.println(plugin_ + " -> " + arena);
-				this.updateSign(plugin_, arena, arenastate, count, maxcount);
+				Bukkit.getScheduler().runTaskLater(this, new Runnable() {
+					public void run() {
+						updateSign(plugin_, arena, arenastate, count, maxcount);
+					}
+				}, 10L);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -75,6 +79,25 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 			e.printStackTrace();
 		}
 		Bukkit.getPlayer(player).sendPluginMessage(plugin, "BungeeCord", stream.toByteArray());
+	}
+
+	@EventHandler
+	public void onBreak(BlockBreakEvent event) {
+		if (event.getBlock().getType() == Material.SIGN_POST || event.getBlock().getType() == Material.WALL_SIGN) {
+			if (getConfig().isSet("arenas.")) {
+				for (String mg_key : getConfig().getConfigurationSection("arenas.").getKeys(false)) {
+					for (String arena_key : getConfig().getConfigurationSection("arenas." + mg_key + ".").getKeys(false)) {
+						Location l = new Location(Bukkit.getWorld(getConfig().getString("arenas." + mg_key + "." + arena_key + ".world")), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.x"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.y"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.z"));
+						System.out.println(l);
+						if (l.distance(event.getBlock().getLocation()) < 1) {
+							getConfig().set("arenas." + mg_key + "." + arena_key + ".server", null);
+							saveConfig();
+							return;
+						}
+					}
+				}
+			}
+		}
 	}
 
 	@EventHandler
@@ -113,7 +136,7 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 
 					p.sendMessage(ChatColor.GREEN + "Successfully set sign.");
 
-					updateSign(arena, "JOIN", event);
+					updateSign(mg, arena, "JOIN", event);
 
 				}
 			}
@@ -125,7 +148,6 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 			for (String mg_key : getConfig().getConfigurationSection("arenas.").getKeys(false)) {
 				for (String arena_key : getConfig().getConfigurationSection("arenas." + mg_key + ".").getKeys(false)) {
 					Location l = new Location(Bukkit.getWorld(getConfig().getString("arenas." + mg_key + "." + arena_key + ".world")), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.x"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.y"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.z"));
-					System.out.println(l);
 					if (l.distance(sign) < 1) {
 						return getConfig().getString("arenas." + mg_key + "." + arena_key + ".server");
 					}
@@ -152,11 +174,14 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 		}
 
 		String[] states = new String[] { "JOIN", "STARTING", "INGAME", "RESTARTING" };
+		ChatColor[] col = new ChatColor[] { ChatColor.GREEN, ChatColor.GREEN, ChatColor.RED, ChatColor.GOLD };
+		int c = 0;
 		for (String state : states) {
-			this.getConfig().addDefault("signs." + state.toLowerCase() + ".0", "[]");
-			this.getConfig().addDefault("signs." + state.toLowerCase() + ".1", "<arena>");
-			this.getConfig().addDefault("signs." + state.toLowerCase() + ".2", "<count>/<maxcount>");
-			this.getConfig().addDefault("signs." + state.toLowerCase() + ".3", "[]");
+			this.getConfig().addDefault("signs." + state.toLowerCase() + ".0", col[c] + "<minigame>");
+			this.getConfig().addDefault("signs." + state.toLowerCase() + ".1", col[c] + "<arena>");
+			this.getConfig().addDefault("signs." + state.toLowerCase() + ".2", col[c] + "<count>/<maxcount>");
+			this.getConfig().addDefault("signs." + state.toLowerCase() + ".3", col[c] + "");
+			c++;
 		}
 
 		this.getConfig().options().copyDefaults(true);
@@ -164,10 +189,10 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 	}
 
 	public Sign getSignFromArena(String mg, String arena) {
-		if (!getConfig().isSet("arenas." + mg + "." + arena + ".sign.world")) {
+		if (!getConfig().isSet("arenas." + mg + "." + arena + ".world")) {
 			return null;
 		}
-		Location b_ = new Location(Bukkit.getServer().getWorld(getConfig().getString("arenas." + mg + "." + arena + ".sign.world")), getConfig().getInt("arenas." + mg + "." + arena + ".sign.loc.x"), getConfig().getInt("arenas." + mg + "." + arena + ".sign.loc.y"), getConfig().getInt("arenas." + mg + "." + arena + ".sign.loc.z"));
+		Location b_ = new Location(Bukkit.getServer().getWorld(getConfig().getString("arenas." + mg + "." + arena + ".world")), getConfig().getInt("arenas." + mg + "." + arena + ".loc.x"), getConfig().getInt("arenas." + mg + "." + arena + ".loc.y"), getConfig().getInt("arenas." + mg + "." + arena + ".loc.z"));
 		if (b_ != null) {
 			if (b_.getWorld() != null) {
 				if (b_.getBlock().getState() != null) {
@@ -185,21 +210,23 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 
 	public void updateSign(String mg, String arenaname, String arenastate, int count, int maxcount) {
 		Sign s = getSignFromArena(mg, arenaname);
+		arenastate = arenastate.toLowerCase();
 		if (s != null) {
-			s.setLine(0, getConfig().getString("signs." + arenastate + ".0").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
-			s.setLine(1, getConfig().getString("signs." + arenastate + ".1").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
-			s.setLine(2, getConfig().getString("signs." + arenastate + ".2").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
-			s.setLine(3, getConfig().getString("signs." + arenastate + ".3").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
+			s.setLine(0, getConfig().getString("signs." + arenastate + ".0").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
+			s.setLine(1, getConfig().getString("signs." + arenastate + ".1").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
+			s.setLine(2, getConfig().getString("signs." + arenastate + ".2").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
+			s.setLine(3, getConfig().getString("signs." + arenastate + ".3").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
 			s.update();
 		}
 	}
 
-	public void updateSign(String arenaname, String arenastate, SignChangeEvent event) {
+	public void updateSign(String mg, String arenaname, String arenastate, SignChangeEvent event) {
 		int count = 0;
 		int maxcount = 10;
-		event.setLine(0, getConfig().getString("signs." + arenastate + ".0").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
-		event.setLine(1, getConfig().getString("signs." + arenastate + ".1").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
-		event.setLine(2, getConfig().getString("signs." + arenastate + ".2").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
-		event.setLine(3, getConfig().getString("signs." + arenastate + ".3").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
+		arenastate = arenastate.toLowerCase();
+		event.setLine(0, getConfig().getString("signs." + arenastate + ".0").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
+		event.setLine(1, getConfig().getString("signs." + arenastate + ".1").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
+		event.setLine(2, getConfig().getString("signs." + arenastate + ".2").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
+		event.setLine(3, getConfig().getString("signs." + arenastate + ".3").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
 	}
 }
