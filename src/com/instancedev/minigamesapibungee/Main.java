@@ -20,6 +20,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 
@@ -58,7 +59,7 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 				final String arenastate = signData.split(":")[2];
 				final int count = Integer.parseInt(signData.split(":")[3]);
 				final int maxcount = Integer.parseInt(signData.split(":")[4]);
-				System.out.println(plugin_ + " -> " + arena);
+				// System.out.println(plugin_ + " -> " + arena);
 				Bukkit.getScheduler().runTaskLater(this, new Runnable() {
 					public void run() {
 						updateSign(plugin_, arena, arenastate, count, maxcount);
@@ -80,6 +81,11 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 			e.printStackTrace();
 		}
 		Bukkit.getPlayer(player).sendPluginMessage(plugin, "BungeeCord", stream.toByteArray());
+	}
+
+	@EventHandler
+	public void onPlayerJoin(PlayerJoinEvent event) {
+		updateAllServerSigns();
 	}
 
 	@EventHandler
@@ -120,8 +126,9 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 
 							ByteArrayOutputStream msgbytes = new ByteArrayOutputStream();
 							DataOutputStream msgout = new DataOutputStream(msgbytes);
-							System.out.println(getInfoBySignLocation(s.getLocation()) + ":" + event.getPlayer().getName());
-							msgout.writeUTF(getInfoBySignLocation(s.getLocation()) + ":" + event.getPlayer().getName());
+							String info = getInfoBySignLocation(s.getLocation()) + ":" + event.getPlayer().getName();
+							System.out.println(info);
+							msgout.writeUTF(info);
 
 							out.writeShort(msgbytes.toByteArray().length);
 							out.write(msgbytes.toByteArray());
@@ -131,7 +138,7 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 							e.printStackTrace();
 						}
 					} catch (Exception e) {
-						// TODO
+						System.out.println("Error occurred while sending first sign request: " + e.getMessage() + " - Invalid server/minigame/arena?");
 					}
 					connectToServer(this, event.getPlayer().getName(), server);
 				}
@@ -160,6 +167,8 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 					p.sendMessage(ChatColor.GREEN + "Successfully set sign.");
 
 					updateSign(mg, arena, "JOIN", event);
+
+					requestServerSign(mg, arena);
 
 				}
 			}
@@ -265,5 +274,42 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 		event.setLine(1, getConfig().getString("signs." + arenastate + ".1").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
 		event.setLine(2, getConfig().getString("signs." + arenastate + ".2").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
 		event.setLine(3, getConfig().getString("signs." + arenastate + ".3").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
+	}
+
+	public void updateAllServerSigns() {
+		if (getConfig().isSet("arenas.")) {
+			for (String mg_key : getConfig().getConfigurationSection("arenas.").getKeys(false)) {
+				for (String arena_key : getConfig().getConfigurationSection("arenas." + mg_key + ".").getKeys(false)) {
+					this.requestServerSign(mg_key, arena_key);
+				}
+			}
+		}
+	}
+
+	public void requestServerSign(String mg_key, String arena_key) {
+		try {
+			ByteArrayDataOutput out = ByteStreams.newDataOutput();
+			try {
+				out.writeUTF("Forward");
+				out.writeUTF("ALL");
+				out.writeUTF("MinigamesLibRequest");
+
+				ByteArrayOutputStream msgbytes = new ByteArrayOutputStream();
+				DataOutputStream msgout = new DataOutputStream(msgbytes);
+				msgout.writeUTF(mg_key + ":" + arena_key);
+
+				out.writeShort(msgbytes.toByteArray().length);
+				out.write(msgbytes.toByteArray());
+
+				Bukkit.getServer().sendPluginMessage(this, "BungeeCord", out.toByteArray());
+
+				// TODO if no answer after 2 seconds, server empty!
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} catch (Exception e) {
+			System.out.println("Error occurred while sending extra sign request: " + e.getMessage());
+		}
 	}
 }
