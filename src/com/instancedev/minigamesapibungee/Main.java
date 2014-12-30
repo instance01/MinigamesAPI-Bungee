@@ -30,6 +30,8 @@ import com.google.common.io.ByteStreams;
 
 public class Main extends JavaPlugin implements PluginMessageListener, Listener {
 
+	BungeeServer serv;
+
 	public void onEnable() {
 		this.getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
 		this.getServer().getMessenger().registerIncomingPluginChannel(this, "BungeeCord", this);
@@ -37,6 +39,17 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 		Bukkit.getPluginManager().registerEvents(this, this);
 
 		init();
+
+		System.out.println("Initializing BungeeServer");
+		serv = new BungeeServer(this);
+	}
+	
+	public void onDisable(){
+		try {
+			serv.server.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	@Override
@@ -62,7 +75,7 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 				// System.out.println(plugin_ + " -> " + arena);
 				Bukkit.getScheduler().runTaskLater(this, new Runnable() {
 					public void run() {
-						updateSign(plugin_, arena, arenastate, count, maxcount);
+						// updateSign(plugin_, arena, arenastate, count, maxcount);
 					}
 				}, 10L);
 			} catch (IOException e) {
@@ -258,6 +271,7 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 		Sign s = getSignFromArena(mg, arenaname);
 		arenastate = arenastate.toLowerCase();
 		if (s != null) {
+			s.getBlock().getChunk().load();
 			s.setLine(0, getConfig().getString("signs." + arenastate + ".0").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
 			s.setLine(1, getConfig().getString("signs." + arenastate + ".1").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
 			s.setLine(2, getConfig().getString("signs." + arenastate + ".2").replaceAll("&", "§").replace("<count>", Integer.toString(count)).replace("<maxcount>", Integer.toString(maxcount)).replace("<arena>", arenaname).replace("<minigame>", mg).replace("[]", new String(squares_mid)).replace("[1]", new String(squares_full).replace("[2]", new String(squares_medium)).replace("[3]", new String(squares_light))));
