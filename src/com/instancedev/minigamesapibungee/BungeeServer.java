@@ -56,7 +56,7 @@ public class BungeeServer {
 										public void run() {
 											plugin.updateSign(plugin_, arena, arenastate, count, maxcount);
 										}
-									}, 10L);
+									}, 2L);
 								}
 							}
 						} catch (Exception e) {
