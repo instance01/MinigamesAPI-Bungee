@@ -13,6 +13,8 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Sign;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -43,13 +45,59 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 		System.out.println("Initializing BungeeServer");
 		serv = new BungeeServer(this);
 	}
-	
-	public void onDisable(){
+
+	public void onDisable() {
 		try {
 			serv.server.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+		// /join <game> <arena> <server> [player]
+		if (args.length > 2) {
+			String game = args[0];
+			String arena = args[1];
+			String server = args[2];
+
+			Player p = null;
+
+			if (sender instanceof Player) {
+				p = (Player) sender;
+			}
+			if (args.length > 3) {
+				p = Bukkit.getPlayer(args[3]);
+			}
+			if (p == null) {
+				return true;
+			}
+
+			ByteArrayDataOutput out = ByteStreams.newDataOutput();
+			try {
+				out.writeUTF("Forward");
+				out.writeUTF("ALL");
+				out.writeUTF("MinigamesLibBack");
+
+				ByteArrayOutputStream msgbytes = new ByteArrayOutputStream();
+				DataOutputStream msgout = new DataOutputStream(msgbytes);
+				String info = game + ":" + arena + ":" + p.getName();
+				System.out.println(info);
+				msgout.writeUTF(info);
+
+				out.writeShort(msgbytes.toByteArray().length);
+				out.write(msgbytes.toByteArray());
+
+				Bukkit.getServer().sendPluginMessage(this, "BungeeCord", out.toByteArray());
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			connectToServer(this, p.getName(), server);
+		} else {
+			sender.sendMessage(ChatColor.GRAY + "Usage: /join <game> <arena> <server> [player]");
+			sender.sendMessage(ChatColor.GRAY + "[player] is optional.");
+		}
+		return true;
 	}
 
 	@Override
