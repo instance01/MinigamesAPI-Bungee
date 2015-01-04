@@ -44,7 +44,6 @@ public class BungeeServer {
 							while ((t = in.readLine()) != null) {
 								if (t.startsWith("sign:")) {
 									System.out.println("Client: " + t);
-									// TODO parse string and update sign
 									String signData = t;
 									final String plugin_ = signData.split(":")[1];
 									final String arena = signData.split(":")[2];

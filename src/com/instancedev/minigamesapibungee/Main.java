@@ -158,7 +158,8 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
 						Location l = new Location(Bukkit.getWorld(getConfig().getString("arenas." + mg_key + "." + arena_key + ".world")), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.x"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.y"), getConfig().getInt("arenas." + mg_key + "." + arena_key + ".loc.z"));
 						System.out.println(l);
 						if (l.distance(event.getBlock().getLocation()) < 1) {
-							getConfig().set("arenas." + mg_key + "." + arena_key + ".server", null);
+							// getConfig().set("arenas." + mg_key + "." + arena_key + ".server", null);
+							getConfig().set("arenas." + mg_key + "." + arena_key, null);
 							saveConfig();
 							return;
 						}
